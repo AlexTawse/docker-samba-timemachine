@@ -2,7 +2,7 @@ FROM ubuntu:16.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -q update \
-    && apt-get install -qy \
+    && apt-get install -y \
       acl attr autoconf bison build-essential \
       debhelper dnsutils docbook-xml docbook-xsl flex gdb krb5-user \
       libacl1-dev libaio-dev libattr1-dev libblkid-dev libbsd-dev \
@@ -13,6 +13,7 @@ RUN apt-get -q update \
       xsltproc zlib1g-dev git \
       avahi-daemon \
       avahi-utils \
+      wget \
     && apt-get -y autoremove \
     && apt-get -y clean \
     && rm -rf /var/lib/apt/lists/* \
@@ -20,21 +21,22 @@ RUN apt-get -q update \
 
 # clone and build samba. Based on this patch: https://github.com/samba-team/samba/pull/64
 RUN cd /tmp \
-    && git clone -b bz12380-full_fsync https://github.com/kevinanderson1/samba.git \
-    && cd samba \
+    && wget https://download.samba.org/pub/samba/rc/samba-4.8.0rc4.tar.gz \
+    && tar -xzf samba-4.8.0rc4.tar.gz \
+    && cd samba-4.8.0rc4 \
     && ./configure && make -j$(nproc) && make -j$(nproc) install \
     && cd /tmp \
     && rm -rf -- ./samba
 
 # install s6-overlay init manager (https://github.com/just-containers/s6-overlay)
 ADD https://github.com/just-containers/s6-overlay/releases/download/v1.17.2.0/s6-overlay-amd64.tar.gz /tmp/
-RUN tar xzf /tmp/s6-overlay-amd64.tar.gz -C /
+RUN tar -xzf /tmp/s6-overlay-amd64.tar.gz -C /
 
 # install samba config
 ADD ./smb.conf /usr/local/samba/etc/smb.conf
 
 # set an upper limit on the reported vol size so that timemachine doesn't eat the entire disk
-ENV TIMEMACHINE_MAX_VOL_SIZE_GB  750
+ENV TIMEMACHINE_MAX_VOL_SIZE_GB  512
 ADD ./samba-dfree.sh /bin/samba-dfree.sh
 
 # create a 'backup' user with password 'backup'
